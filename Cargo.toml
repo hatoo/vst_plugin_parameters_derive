@@ -1,0 +1,13 @@
+[package]
+name = "vst_plugin_parameters_derive"
+version = "0.1.0"
+authors = ["hatoo <hato2000@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+vst_plugin_parameters_derive_impl = { path = "./vst_plugin_parameters_derive_impl", version = "0.1" }
+
+[dev-dependencies]
+vst = "0.2"
