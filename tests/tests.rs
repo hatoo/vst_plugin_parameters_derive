@@ -68,7 +68,7 @@ fn single_param() {
     #[allow(dead_code)]
     #[derive(PluginParameters, NumPluginParameters)]
     struct OneParam {
-        #[param(name = "some_awesome_name", label = "label")]
+        #[param(name = "some_awesome_name", label = "label", text = "text")]
         x: AtomicFloat,
     }
 
@@ -78,6 +78,7 @@ fn single_param() {
 
     assert_eq!(p.get_parameter_name(0), "some_awesome_name");
     assert_eq!(p.get_parameter_label(0), "label");
+    assert_eq!(p.get_parameter_text(0), "text");
     assert_eq!(p.get_parameter(0), 0.5);
     p.set_parameter(0, 0.0);
     assert_eq!(p.get_parameter(0), 0.0);
