@@ -13,7 +13,7 @@ fn it_works() {
 fn num_single_param() {
     #[derive(PluginParameters, NumPluginParameters)]
     struct OneParam {
-        #[param(name = "some_awesome_name")]
+        #[param(name = "some_awesome_name", label = "label")]
         x: AtomicFloat,
     }
 
@@ -68,7 +68,7 @@ fn single_param() {
     #[allow(dead_code)]
     #[derive(PluginParameters, NumPluginParameters)]
     struct OneParam {
-        #[param(name = "some_awesome_name")]
+        #[param(name = "some_awesome_name", label = "label")]
         x: AtomicFloat,
     }
 
@@ -77,6 +77,7 @@ fn single_param() {
     };
 
     assert_eq!(p.get_parameter_name(0), "some_awesome_name");
+    assert_eq!(p.get_parameter_label(0), "label");
     assert_eq!(p.get_parameter(0), 0.5);
     p.set_parameter(0, 0.0);
     assert_eq!(p.get_parameter(0), 0.0);
@@ -143,7 +144,7 @@ fn nested_params() {
 
     impl Default for MultipleParams {
         fn default() -> Self {
-            Self  {
+            Self {
                 x: AtomicFloat::new(0.5),
                 y: AtomicFloat::new(0.2),
                 z: AtomicFloat::new(0.4),

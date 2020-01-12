@@ -7,6 +7,7 @@ use syn::{Data, DeriveInput, Ident, Lit, Meta, NestedMeta, Type};
 struct Param {
     ident: Ident,
     name: Option<String>,
+    label: Option<String>,
 }
 
 struct Params {
@@ -19,10 +20,10 @@ enum Element {
     Params(Params),
 }
 
-fn get_name(meta: &Meta) -> Option<String> {
+fn get_meta_param(meta: &Meta, key: &str) -> Option<String> {
     match meta {
         Meta::NameValue(name_value) => {
-            if name_value.path.is_ident("name") {
+            if name_value.path.is_ident(key) {
                 match &name_value.lit {
                     Lit::Str(lit_str) => Some(lit_str.value()),
                     _ => None,
@@ -35,7 +36,7 @@ fn get_name(meta: &Meta) -> Option<String> {
             .nested
             .iter()
             .filter_map(|nested_meta| match nested_meta {
-                NestedMeta::Meta(meta) => get_name(meta),
+                NestedMeta::Meta(meta) => get_meta_param(meta, key),
                 _ => None,
             })
             .next(),
@@ -55,12 +56,14 @@ pub fn num_parameters_derive(input: TokenStream) -> TokenStream {
             .filter_map(|field| {
                 if let Some(attr) = field.attrs.iter().find(|attr| attr.path.is_ident("param")) {
                     let meta: Meta = attr.parse_meta().unwrap();
-                    let name = get_name(&meta);
+                    let name = get_meta_param(&meta, "name");
+                    let label = get_meta_param(&meta, "label");
 
                     Some(Element::Param({
                         Param {
                             ident: field.ident.unwrap(),
                             name,
+                            label,
                         }
                     }))
                 } else if field.attrs.iter().any(|attr| attr.path.is_ident("params")) {
@@ -122,12 +125,14 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
             .filter_map(|field| {
                 if let Some(attr) = field.attrs.iter().find(|attr| attr.path.is_ident("param")) {
                     let meta: Meta = attr.parse_meta().unwrap();
-                    let name = get_name(&meta);
+                    let name = get_meta_param(&meta, "name");
+                    let label = get_meta_param(&meta, "label");
 
                     Some(Element::Param({
                         Param {
                             ident: field.ident.unwrap(),
                             name,
+                            label,
                         }
                     }))
                 } else if field.attrs.iter().any(|attr| attr.path.is_ident("params")) {
@@ -145,7 +150,7 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
 
     // TODO Use macros to create impls.
     let get_parameters_name_impl = {
-        let mut index = quote!{ 0 };
+        let mut index = quote! { 0 };
         let mut match_inner = quote! {};
 
         for element in &elements {
@@ -178,8 +183,42 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
         }
     };
 
+    let get_parameters_label_impl = {
+        let mut index = quote! { 0 };
+        let mut match_inner = quote! {};
+
+        for element in &elements {
+            match element {
+                Element::Param(param) => {
+                    let label = param.label.clone().unwrap_or_default();
+                    match_inner = quote! {
+                        #match_inner
+                        x if x == (#index) => #label.to_string(),
+                    };
+                    index = quote! { #index + 1 };
+                }
+                Element::Params(params) => {
+                    let ident = &params.ident;
+                    let ty = &params.ty;
+                    match_inner = quote! {
+                        #match_inner
+                        x if (#index .. #index + #ty::num_parameters()).contains(&x) => self.#ident.get_parameter_label(index - (#index)),
+                    };
+                    index = quote! { #index + #ty::num_parameters() };
+                }
+            }
+        }
+
+        quote! {
+            match index {
+                #match_inner
+                _ => String::new(),
+            }
+        }
+    };
+
     let get_parameter_impl = {
-        let mut index = quote!{ 0 };
+        let mut index = quote! { 0 };
         let mut match_inner = quote! {};
 
         for element in &elements {
@@ -213,7 +252,7 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
     };
 
     let set_parameter_impl = {
-        let mut index = quote!{ 0 };
+        let mut index = quote! { 0 };
         let mut match_inner = quote! {};
 
         for element in &elements {
@@ -250,6 +289,10 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
        impl PluginParameters for #struct_name {
            fn get_parameter_name(&self, index: i32) -> String {
                #get_parameters_name_impl
+           }
+
+           fn get_parameter_label(&self, index: i32) -> String {
+               #get_parameters_label_impl
            }
 
            fn get_parameter(&self, index: i32) -> f32 {
