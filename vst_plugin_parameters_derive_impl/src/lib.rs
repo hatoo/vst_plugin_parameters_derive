@@ -173,7 +173,6 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
         _ => unimplemented!(),
     };
 
-    // TODO Use macros to create impls.
     let get_parameters_name_impl = method_impl(
         &elements,
         |param| {
@@ -189,141 +188,65 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
         quote! { String::new() },
     );
 
-    let get_parameters_label_impl = {
-        let mut index = quote! { 0 };
-        let mut match_inner = quote! {};
-
-        for element in &elements {
-            match element {
-                Element::Param(param) => {
-                    let label = param.label.clone().unwrap_or_default();
-                    match_inner = quote! {
-                        #match_inner
-                        x if x == (#index) => #label.to_string(),
-                    };
-                    index = quote! { #index + 1 };
-                }
-                Element::Params(params) => {
-                    let ident = &params.ident;
-                    let ty = &params.ty;
-                    match_inner = quote! {
-                        #match_inner
-                        x if (#index .. #index + #ty::num_parameters()).contains(&x) => self.#ident.get_parameter_label(index - (#index)),
-                    };
-                    index = quote! { #index + #ty::num_parameters() };
-                }
+    let get_parameters_label_impl = method_impl(
+        &elements,
+        |param| {
+            let label = param.label.clone().unwrap_or_default();
+            quote! { #label.to_string() }
+        },
+        |params, index| {
+            let ident = &params.ident;
+            quote! {
+                self.#ident.get_parameter_label(#index)
             }
-        }
+        },
+        quote! { String::new() },
+    );
 
-        quote! {
-            match index {
-                #match_inner
-                _ => String::new(),
+    let get_parameters_text_impl = method_impl(
+        &elements,
+        |param| {
+            let label = param.text.clone().unwrap_or_default();
+            quote! { #label.to_string() }
+        },
+        |params, index| {
+            let ident = &params.ident;
+            quote! {
+                self.#ident.get_parameter_text(#index)
             }
-        }
-    };
+        },
+        quote! { String::new() },
+    );
 
-    let get_parameters_text_impl = {
-        let mut index = quote! { 0 };
-        let mut match_inner = quote! {};
-
-        for element in &elements {
-            match element {
-                Element::Param(param) => {
-                    let text = param.text.clone().unwrap_or_default();
-                    match_inner = quote! {
-                        #match_inner
-                        x if x == (#index) => #text.to_string(),
-                    };
-                    index = quote! { #index + 1 };
-                }
-                Element::Params(params) => {
-                    let ident = &params.ident;
-                    let ty = &params.ty;
-                    match_inner = quote! {
-                        #match_inner
-                        x if (#index .. #index + #ty::num_parameters()).contains(&x) => self.#ident.get_parameter_text(index - (#index)),
-                    };
-                    index = quote! { #index + #ty::num_parameters() };
-                }
+    let get_parameter_impl = method_impl(
+        &elements,
+        |param| {
+            let ident = &param.ident;
+            quote! { self.#ident.get() }
+        },
+        |params, index| {
+            let ident = &params.ident;
+            quote! {
+                self.#ident.get_parameter(#index)
             }
-        }
+        },
+        quote! { 0.0 },
+    );
 
-        quote! {
-            match index {
-                #match_inner
-                _ => String::new(),
+    let set_parameter_impl = method_impl(
+        &elements,
+        |param| {
+            let ident = &param.ident;
+            quote! { {self.#ident.set(value);} }
+        },
+        |params, index| {
+            let ident = &params.ident;
+            quote! {
+                {self.#ident.set_parameter(#index, value);}
             }
-        }
-    };
-
-    let get_parameter_impl = {
-        let mut index = quote! { 0 };
-        let mut match_inner = quote! {};
-
-        for element in &elements {
-            match element {
-                Element::Param(param) => {
-                    let ident = &param.ident;
-                    match_inner = quote! {
-                        #match_inner
-                        x if x == (#index) => self.#ident.get(),
-                    };
-                    index = quote! { #index + 1 };
-                }
-                Element::Params(params) => {
-                    let ident = &params.ident;
-                    let ty = &params.ty;
-                    match_inner = quote! {
-                        #match_inner
-                        x if (#index .. #index + #ty::num_parameters()).contains(&x) => self.#ident.get_parameter(index - (#index)),
-                    };
-                    index = quote! { #index + #ty::num_parameters() };
-                }
-            }
-        }
-
-        quote! {
-            match index {
-                #match_inner
-                _ => 0.0,
-            }
-        }
-    };
-
-    let set_parameter_impl = {
-        let mut index = quote! { 0 };
-        let mut match_inner = quote! {};
-
-        for element in &elements {
-            match element {
-                Element::Param(param) => {
-                    let ident = &param.ident;
-                    match_inner = quote! {
-                        #match_inner
-                        x if x == (#index) => self.#ident.set(value),
-                    };
-                    index = quote! { #index + 1 };
-                }
-                Element::Params(params) => {
-                    let ident = &params.ident;
-                    let ty = &params.ty;
-                    match_inner = quote! {
-                        #match_inner
-                        x if (#index .. #index + #ty::num_parameters()).contains(&x) => self.#ident.set_parameter(index - (#index), value),
-                    };
-                    index = quote! { #index + #ty::num_parameters() };
-                }
-            }
-        }
-
-        quote! {
-            match index {
-                #match_inner
-                _ => {}
-            }
-        }
-    };
+        },
+        quote! { {} },
+    );
 
     let gen = quote! {
        impl PluginParameters for #struct_name {
