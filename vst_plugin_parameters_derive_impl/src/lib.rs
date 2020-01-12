@@ -2,7 +2,7 @@ extern crate proc_macro;
 
 use crate::proc_macro::TokenStream;
 use quote::quote;
-use syn::{Data, DeriveInput, Ident, Lit, Meta, NestedMeta, Type, Field};
+use syn::{Data, DeriveInput, Field, Ident, Lit, Meta, NestedMeta, Type};
 
 struct Param {
     ident: Ident,
@@ -34,7 +34,7 @@ impl Element {
                     ident: field.ident.unwrap(),
                     name,
                     label,
-                    text
+                    text,
                 }
             }))
         } else if field.attrs.iter().any(|attr| attr.path.is_ident("params")) {
@@ -120,6 +120,45 @@ pub fn num_parameters_derive(input: TokenStream) -> TokenStream {
     gen.into()
 }
 
+fn method_impl(
+    elements: &[Element],
+    param_expr: impl Fn(&Param) -> proc_macro2::TokenStream,
+    params_expr: impl Fn(&Params, proc_macro2::TokenStream) -> proc_macro2::TokenStream,
+    def: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    let mut index = quote! { 0 };
+    let mut match_inner = quote! {};
+
+    for element in elements {
+        match element {
+            Element::Param(param) => {
+                let expr = param_expr(&param);
+                match_inner = quote! {
+                    #match_inner
+                    x if x == (#index) => #expr,
+                };
+                index = quote! { #index + 1 };
+            }
+            Element::Params(params) => {
+                let ty = &params.ty;
+                let body = params_expr(&params, quote! { index - (#index) });
+                match_inner = quote! {
+                    #match_inner
+                    x if (#index .. #index + #ty::num_parameters()).contains(&x) => #body,
+                };
+                index = quote! { #index + #ty::num_parameters() };
+            }
+        }
+    }
+
+    quote! {
+        match index {
+            #match_inner
+            _ => #def,
+        }
+    }
+}
+
 #[proc_macro_derive(PluginParameters, attributes(param, params))]
 pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(input).unwrap();
@@ -135,39 +174,20 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
     };
 
     // TODO Use macros to create impls.
-    let get_parameters_name_impl = {
-        let mut index = quote! { 0 };
-        let mut match_inner = quote! {};
-
-        for element in &elements {
-            match element {
-                Element::Param(param) => {
-                    let name = param.name.clone().unwrap_or_default();
-                    match_inner = quote! {
-                        #match_inner
-                        x if x == (#index) => #name.to_string(),
-                    };
-                    index = quote! { #index + 1 };
-                }
-                Element::Params(params) => {
-                    let ident = &params.ident;
-                    let ty = &params.ty;
-                    match_inner = quote! {
-                        #match_inner
-                        x if (#index .. #index + #ty::num_parameters()).contains(&x) => self.#ident.get_parameter_name(index - (#index)),
-                    };
-                    index = quote! { #index + #ty::num_parameters() };
-                }
+    let get_parameters_name_impl = method_impl(
+        &elements,
+        |param| {
+            let name = param.name.clone().unwrap_or_default();
+            quote! { #name.to_string() }
+        },
+        |params, index| {
+            let ident = &params.ident;
+            quote! {
+                self.#ident.get_parameter_name(#index)
             }
-        }
-
-        quote! {
-            match index {
-                #match_inner
-                _ => String::new(),
-            }
-        }
-    };
+        },
+        quote! { String::new() },
+    );
 
     let get_parameters_label_impl = {
         let mut index = quote! { 0 };
@@ -329,6 +349,6 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
        }
     };
 
-    // eprintln!("{}", &gen);
+    eprintln!("{}", &gen);
     gen.into()
 }
