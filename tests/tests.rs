@@ -39,6 +39,7 @@ fn demo() {
     struct NestedParams {
         #[params]
         p1: Params,
+        // You can set prefix for name.
         #[params(prefix = "prefix ")]
         p2: Params,
     }
