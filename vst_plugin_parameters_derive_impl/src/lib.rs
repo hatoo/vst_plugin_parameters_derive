@@ -8,12 +8,12 @@ struct Param {
     ident: Ident,
     name: Option<String>,
     label: Option<String>,
-    text: Option<String>,
 }
 
 struct Params {
     ident: Ident,
     ty: Type,
+    prefix: Option<String>,
 }
 
 enum Element {
@@ -24,23 +24,24 @@ enum Element {
 impl Element {
     fn from_field(field: Field) -> Option<Self> {
         if let Some(attr) = field.attrs.iter().find(|attr| attr.path.is_ident("param")) {
-            let meta: Meta = attr.parse_meta().unwrap();
+            let meta = attr.parse_meta().unwrap();
             let name = get_meta_param(&meta, "name");
             let label = get_meta_param(&meta, "label");
-            let text = get_meta_param(&meta, "text");
 
             Some(Element::Param({
                 Param {
                     ident: field.ident.unwrap(),
                     name,
                     label,
-                    text,
                 }
             }))
-        } else if field.attrs.iter().any(|attr| attr.path.is_ident("params")) {
+        } else if let Some(attr) = field.attrs.iter().find(|attr| attr.path.is_ident("params")) {
+            let meta = attr.parse_meta().unwrap();
+            let prefix = get_meta_param(&meta, "prefix");
             Some(Element::Params(Params {
                 ident: field.ident.unwrap(),
                 ty: field.ty,
+                prefix,
             }))
         } else {
             None
@@ -181,8 +182,14 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
         },
         |params, index| {
             let ident = &params.ident;
-            quote! {
-                self.#ident.get_parameter_name(#index)
+            if let Some(prefix) = params.prefix.as_ref() {
+                quote! {
+                    format!("{}{}", #prefix, self.#ident.get_parameter_name(#index))
+                }
+            } else {
+                quote! {
+                    self.#ident.get_parameter_name(#index)
+                }
             }
         },
         quote! { String::new() },
@@ -206,8 +213,8 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
     let get_parameters_text_impl = method_impl(
         &elements,
         |param| {
-            let label = param.text.clone().unwrap_or_default();
-            quote! { #label.to_string() }
+            let ident = &param.ident;
+            quote! { format!("{:.3}", self.#ident.get()) }
         },
         |params, index| {
             let ident = &params.ident;
