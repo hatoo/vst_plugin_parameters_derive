@@ -176,7 +176,7 @@ pub fn plugin_parameters_derive(input: TokenStream) -> TokenStream {
     let get_parameters_name_impl = method_impl(
         &elements,
         |param| {
-            let name = param.name.clone().unwrap_or_default();
+            let name = param.name.clone().unwrap_or(param.ident.to_string());
             quote! { #name.to_string() }
         },
         |params, index| {

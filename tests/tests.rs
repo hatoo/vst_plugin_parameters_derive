@@ -13,7 +13,7 @@ fn it_works() {
 fn num_single_param() {
     #[derive(PluginParameters, NumPluginParameters)]
     struct OneParam {
-        #[param(name = "some_awesome_name", label = "label")]
+        #[param]
         x: AtomicFloat,
     }
 
@@ -25,11 +25,11 @@ fn num_multiple_param() {
     #[allow(dead_code)]
     #[derive(PluginParameters, NumPluginParameters)]
     struct MultipleParam {
-        #[param(name = "x")]
+        #[param]
         x: AtomicFloat,
-        #[param(name = "y")]
+        #[param]
         y: AtomicFloat,
-        #[param(name = "z")]
+        #[param]
         z: AtomicFloat,
     }
 
@@ -41,11 +41,11 @@ fn num_nest_params() {
     #[allow(dead_code)]
     #[derive(PluginParameters, NumPluginParameters)]
     struct MultipleParam {
-        #[param(name = "x")]
+        #[param]
         x: AtomicFloat,
-        #[param(name = "y")]
+        #[param]
         y: AtomicFloat,
-        #[param(name = "z")]
+        #[param]
         z: AtomicFloat,
     }
 
@@ -82,6 +82,19 @@ fn single_param() {
     assert_eq!(p.get_parameter(0), 0.5);
     p.set_parameter(0, 0.0);
     assert_eq!(p.get_parameter(0), 0.0);
+
+    #[allow(dead_code)]
+    #[derive(PluginParameters, NumPluginParameters)]
+    struct OneParamAutoName {
+        #[param]
+        x: AtomicFloat,
+    }
+
+    let p = OneParamAutoName {
+        x: AtomicFloat::new(0.5),
+    };
+
+    assert_eq!(p.get_parameter_name(0), "x");
 }
 
 #[test]
